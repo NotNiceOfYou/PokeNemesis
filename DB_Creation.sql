@@ -6,7 +6,8 @@ atk int,
 sp_atk int,
 def int,
 sp_def int,
-speed int
+speed int,
+generation int
 );
 
 create table types(
@@ -58,4 +59,12 @@ create table pokemon_moves(
 pokemon_id int,
 move_id int,
 level_learned int
+);
+
+create table evolutions(
+pokemon_id_start int,
+pokemon_id_end int,
+level_evolved int
+foreign key (pokemon_id_start) references pokemon(id),
+foreign key (pokemon_id_end) references pokemon(id)
 );
