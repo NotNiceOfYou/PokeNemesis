@@ -32,20 +32,6 @@ foreign key (atk_id) references types(id),
 foreign key (def_id) references types(id)
 );
 
-create table routes(
-id int primary key,
-name varchar(255),
-index int
-);
-
-create table encounters(
-id int primary key,
-pokemon_id int,
-route_id int,
-foreign key (pokemon_id) references pokemon(id),
-foreign key (route_id) references routes(id)
-);
-
 create table moves(
 id int primary key,
 name varchar(255),

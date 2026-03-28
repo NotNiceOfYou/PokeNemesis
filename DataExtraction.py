@@ -197,10 +197,9 @@ def load_evolutions(cur):
 def main():
     conn, cur = connect_db()
     try:
-        
-        load_types_and_effectiveness(cur)
-        load_moves(cur)
-        load_pokemon(cur)
+        #load_types_and_effectiveness(cur)
+        #load_moves(cur)
+        #load_pokemon(cur)
         load_evolutions(cur)
         print("All data loaded successfully.")
     finally:
