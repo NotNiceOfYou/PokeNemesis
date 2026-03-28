@@ -1,0 +1,127 @@
+/* Pixelated Theme */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* {
+    box-sizing: border-box;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+body {
+    background: #2e2e2e;
+    background-image: repeating-linear-gradient(0deg, #3a3a3a 1px, #2e2e2e 2px);
+    font-family: 'Press Start 2P', monospace;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #1a1a1a;
+    border: 4px solid #6b6b6b;
+    padding: 20px;
+    box-shadow: 8px 8px 0 #00000055;
+}
+
+h1, h2, h3 {
+    font-family: 'Press Start 2P', monospace;
+    text-shadow: 2px 2px 0 #000;
+    margin-top: 0;
+}
+
+button, .button {
+    background: #4e4e4e;
+    border: 2px solid #8b8b8b;
+    color: white;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+button:hover {
+    background: #6e6e6e;
+    border-color: #adadad;
+    transform: translate(-1px, -1px);
+}
+button:active {
+    transform: translate(1px, 1px);
+}
+
+input, select {
+    background: #2a2a2a;
+    border: 2px solid #6b6b6b;
+    color: white;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    padding: 8px;
+}
+
+.grid-6 {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.pokemon-slot {
+    background: #2a2a2a;
+    border: 2px solid #6b6b6b;
+    text-align: center;
+    padding: 10px;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.pokemon-slot img {
+    width: 80px;
+    height: 80px;
+    image-rendering: pixelated;
+    margin-bottom: 8px;
+}
+
+.slot-empty {
+    color: #8b8b8b;
+    font-size: 10px;
+}
+
+.team-list {
+    margin-top: 20px;
+    border-top: 2px solid #6b6b6b;
+    padding-top: 20px;
+}
+
+.team-item {
+    background: #2a2a2a;
+    border: 2px solid #6b6b6b;
+    margin-bottom: 10px;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.team-name {
+    font-weight: bold;
+}
+
+.team-preview {
+    display: flex;
+    gap: 4px;
+}
+
+.team-preview img {
+    width: 32px;
+    height: 32px;
+    image-rendering: pixelated;
+}
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}

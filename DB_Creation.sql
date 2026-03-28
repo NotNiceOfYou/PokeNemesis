@@ -54,3 +54,16 @@ level_evolved int
 foreign key (pokemon_id_start) references pokemon(id),
 foreign key (pokemon_id_end) references pokemon(id)
 );
+
+create table users (
+    id int primary key,
+    username varchar(255) unique not null,
+    password_hash varchar(255) not null
+);
+
+create table teams (
+    id int primary key,
+    user_id int references users(id) on delete cascade,
+    name varchar(255) not null,
+    pokemon_ids int[] not null
+);

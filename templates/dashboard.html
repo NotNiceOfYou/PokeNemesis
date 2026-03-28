@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PokéNemesis - Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #1a1a1a;
+            border: 4px solid #6b6b6b;
+            padding: 20px;
+            width: 400px;
+            max-width: 90%;
+        }
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .search-result-item {
+            padding: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #6b6b6b;
+        }
+        .search-result-item img {
+            width: 32px;
+            height: 32px;
+            image-rendering: pixelated;
+        }
+        .search-result-item:hover {
+            background: #3a3a3a;
+        }
+        .team-actions {
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚔️ POKÉNEMESIS ⚔️</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>Welcome, <span id="username"></span>!</div>
+            <button id="logoutBtn">LOGOUT</button>
+        </div>
+
+        <h2>Your Team (6)</h2>
+        <div id="teamSlots" class="grid-6"></div>
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="teamName" placeholder="Team Name" style="width: 200px;">
+            <button id="saveTeamBtn">💾 SAVE TEAM</button>
+            <button id="generateNemesisBtn">⚡ GENERATE NEMESIS</button>
+        </div>
+
+        <h2>Saved Teams (max 10)</h2>
+        <div id="savedTeamsList"></div>
+
+        <h2>Nemesis Team</h2>
+        <div id="nemesisSlots" class="grid-6"></div>
+    </div>
+
+    <!-- Modal for Pokémon selection -->
+    <div id="pokemonModal" class="modal">
+        <div class="modal-content">
+            <h3>Select Pokémon</h3>
+            <input type="text" id="searchInput" placeholder="Search by name..." autocomplete="off">
+            <div id="searchResults" class="search-results"></div>
+            <button id="closeModal">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // ---------- Global Data ----------
+        let pokemonList = [];       // [{ id, name, sprite_url }]
+        let currentTeam = [null, null, null, null, null, null]; // stores pokemon objects or null
+        let activeSlot = null;      // index of slot being edited
+        let currentUserId = null;
+
+        // Helper: format name for sprite (same as Python)
+        function formatSpriteName(name) {
+            return name.toLowerCase()
+                .replace(/[ \-\.\':♀♂]/g, '')
+                .replace(/[^\w]/g, '');
+        }
+
+        // ---------- Fetch initial data ----------
+        async function fetchUserData() {
+            const res = await fetch('/api/user');
+            if (!res.ok) {
+                window.location.href = '/login';
+                return;
+            }
+            const data = await res.json();
+            document.getElementById('username').innerText = data.username;
+            currentUserId = data.user_id;
+        }
+
+        async function fetchPokemonList() {
+            const res = await fetch('/api/pokemon');
+            const data = await res.json();
+            pokemonList = data.map(p => ({
+                id: p.id,
+                name: p.name,
+                sprite_url: `/static/sprites/${formatSpriteName(p.name)}.png`
+            }));
+        }
+
+        async function fetchTeams() {
+            const res = await fetch('/api/teams');
+            const teams = await res.json();
+            renderSavedTeams(teams);
+        }
+
+        // ---------- Render Functions ----------
+        function renderTeamSlots() {
+            const container = document.getElementById('teamSlots');
+            container.innerHTML = '';
+            currentTeam.forEach((pokemon, idx) => {
+                const slot = document.createElement('div');
+                slot.className = 'pokemon-slot';
+                if (pokemon) {
+                    slot.innerHTML = `
+                        <img src="${pokemon.sprite_url}" alt="${pokemon.name}">
+                        <div>${pokemon.name}</div>
+                        <button class="remove-btn" data-index="${idx}">✖</button>
+                    `;
+                } else {
+                    slot.innerHTML = `
+                        <div class="slot-empty">+ Add</div>
+                    `;
+                }
+                slot.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remove-btn')) return;
+                    openModal(idx);
+                });
+                container.appendChild(slot);
+            });
+            // Attach remove button listeners
+            document.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(btn.dataset.index);
+                    currentTeam[idx] = null;
+                    renderTeamSlots();
+                });
+            });
+        }
+
+        function renderSavedTeams(teams) {
+            const container = document.getElementById('savedTeamsList');
+            if (teams.length === 0) {
+                container.innerHTML = '<p>No teams saved yet.</p>';
+                return;
+            }
+            container.innerHTML = '';
+            teams.forEach(team => {
+                const div = document.createElement('div');
+                div.className = 'team-item';
+                div.innerHTML = `
+                    <div class="team-name">${team.name}</div>
+                    <div class="team-preview">
+                        ${team.pokemon_ids.map(id => {
+                            const poke = pokemonList.find(p => p.id === id);
+                            if (!poke) return '';
+                            return `<img src="${poke.sprite_url}" title="${poke.name}">`;
+                        }).join('')}
+                    </div>
+                    <div class="team-actions">
+                        <button class="load-team" data-id="${team.id}" data-pokemon='${JSON.stringify(team.pokemon_ids)}'>LOAD</button>
+                        <button class="delete-team" data-id="${team.id}">DELETE</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            // Attach load and delete listeners
+            document.querySelectorAll('.load-team').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pokemonIds = JSON.parse(btn.dataset.pokemon);
+                    loadTeamByIds(pokemonIds);
+                });
+            });
+            document.querySelectorAll('.delete-team').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const teamId = btn.dataset.id;
+                    await fetch(`/api/teams/${teamId}`, { method: 'DELETE' });
+                    fetchTeams(); // refresh
+                });
+            });
+        }
+
+        function loadTeamByIds(ids) {
+            currentTeam = ids.map(id => {
+                const found = pokemonList.find(p => p.id === id);
+                return found || null;
+            });
+            renderTeamSlots();
+        }
+
+        function renderNemesisTeam(nemesisIds) {
+            const container = document.getElementById('nemesisSlots');
+            container.innerHTML = '';
+            nemesisIds.forEach(id => {
+                const pokemon = pokemonList.find(p => p.id === id);
+                if (!pokemon) return;
+                const slot = document.createElement('div');
+                slot.className = 'pokemon-slot';
+                slot.innerHTML = `
+                    <img src="${pokemon.sprite_url}" alt="${pokemon.name}">
+                    <div>${pokemon.name}</div>
+                `;
+                container.appendChild(slot);
+            });
+        }
+
+        // ---------- Modal for Pokémon selection ----------
+        function openModal(slotIndex) {
+            activeSlot = slotIndex;
+            document.getElementById('pokemonModal').style.display = 'flex';
+            document.getElementById('searchInput').value = '';
+            searchPokemon('');
+        }
+
+        function closeModal() {
+            document.getElementById('pokemonModal').style.display = 'none';
+        }
+
+        function searchPokemon(query) {
+            const results = pokemonList.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+            const container = document.getElementById('searchResults');
+            container.innerHTML = '';
+            results.slice(0, 30).forEach(poke => {
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+                item.innerHTML = `
+                    <img src="${poke.sprite_url}" alt="${poke.name}">
+                    <span>${poke.name}</span>
+                `;
+                item.addEventListener('click', () => {
+                    currentTeam[activeSlot] = poke;
+                    renderTeamSlots();
+                    closeModal();
+                });
+                container.appendChild(item);
+            });
+        }
+
+        // ---------- Event Handlers ----------
+        async function saveTeam() {
+            const name = document.getElementById('teamName').value.trim();
+            if (!name) {
+                alert('Please enter a team name');
+                return;
+            }
+            const pokemonIds = currentTeam.map(p => p ? p.id : null);
+            if (pokemonIds.includes(null)) {
+                alert('Please fill all 6 slots');
+                return;
+            }
+            const res = await fetch('/api/teams', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, pokemon_ids: pokemonIds })
+            });
+            if (res.ok) {
+                document.getElementById('teamName').value = '';
+                fetchTeams();
+                alert('Team saved!');
+            } else {
+                const err = await res.json();
+                alert(err.error || 'Failed to save team');
+            }
+        }
+
+        async function generateNemesis() {
+            const pokemonIds = currentTeam.map(p => p ? p.id : null);
+            if (pokemonIds.includes(null)) {
+                alert('Please fill all 6 slots before generating nemesis');
+                return;
+            }
+            const res = await fetch('/api/nemesis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ team: pokemonIds })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                renderNemesisTeam(data.nemesis_team);
+            } else {
+                const err = await res.json();
+                alert(err.error || 'Nemesis generation failed');
+            }
+        }
+
+        // ---------- Init ----------
+        window.addEventListener('load', async () => {
+            await fetchUserData();
+            await fetchPokemonList();
+            await fetchTeams();
+            renderTeamSlots();
+
+            // Modal events
+            document.getElementById('closeModal').addEventListener('click', closeModal);
+            document.getElementById('searchInput').addEventListener('input', (e) => searchPokemon(e.target.value));
+            document.getElementById('saveTeamBtn').addEventListener('click', saveTeam);
+            document.getElementById('generateNemesisBtn').addEventListener('click', generateNemesis);
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/login');
+            });
+        });
+    </script>
+</body>
+</html>
