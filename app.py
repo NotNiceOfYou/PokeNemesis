@@ -12,7 +12,7 @@ app.secret_key = 'your-secret-key-here-change-in-production'  # Change this!
 DB_CONFIG = {
     'dbname': 'PokemonDatabase',
     'user': 'postgres',
-    'password': 'abcd1234',
+    'password': '######',
     'host': 'localhost',
     'port': '5432'
 }
@@ -25,6 +25,9 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
+            # For API routes return 401, for page routes redirect
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Not logged in'}), 401
             return redirect(url_for('login_page'))
         return f(*args, **kwargs)
     return decorated_function
@@ -56,10 +59,12 @@ def api_user():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT username FROM users WHERE id = %s", (session['user_id'],))
-    username = cur.fetchone()[0]
+    row = cur.fetchone()
     cur.close()
     conn.close()
-    return jsonify({'user_id': session['user_id'], 'username': username})
+    if not row:
+        return jsonify({'error': 'User not found'}), 404
+    return jsonify({'user_id': session['user_id'], 'username': row[0]})
 
 @app.route('/api/pokemon', methods=['GET'])
 @login_required
@@ -101,8 +106,10 @@ def api_teams():
         cur.execute("SELECT COUNT(*) FROM teams WHERE user_id = %s", (session['user_id'],))
         count = cur.fetchone()[0]
         if count >= 10:
+            cur.close()
+            conn.close()
             return jsonify({'error': 'You already have 10 teams. Delete one first.'}), 400
-        # Insert
+        # Insert — use DEFAULT for id (SERIAL)
         cur.execute("""
             INSERT INTO teams (user_id, name, pokemon_ids)
             VALUES (%s, %s, %s)
@@ -132,9 +139,6 @@ def api_nemesis():
     if not opponent_ids or len(opponent_ids) != 6:
         return jsonify({'error': 'Team must contain exactly 6 Pokémon IDs'}), 400
 
-    # ---------- Simple Nemesis Generator ----------
-    # This example picks counters based on type advantages.
-    # Replace with your own logic.
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -156,20 +160,20 @@ def api_nemesis():
     for atk, dfn, mul in cur.fetchall():
         effectiveness[(atk, dfn)] = mul
 
-    # For each opponent, find the best counter (simple: highest average effectiveness)
+    # Fetch all available pokemon IDs once (not inside the loop!)
+    cur.execute("SELECT id FROM pokemon ORDER BY id")
+    all_pokemon_ids = [row[0] for row in cur.fetchall()]
+
+    # For each opponent, find the best counter based on type effectiveness
     counter_scores = {}
     for opp_id in opponent_ids:
         opp_types = pokemon_types.get(opp_id, [])
-        # Evaluate all Pokémon
-        cur.execute("SELECT id FROM pokemon")  # could be optimized
-        all_pokemon = [row[0] for row in cur.fetchall()]
         best_score = -1
         best_pokemon = None
-        for pid in all_pokemon:
-            if pid in opponent_ids:  # avoid picking opponent itself
+        for pid in all_pokemon_ids:
+            if pid in opponent_ids:
                 continue
             attacker_types = pokemon_types.get(pid, [])
-            # Compute average effectiveness of attacker's types against opponent's types
             if not attacker_types or not opp_types:
                 continue
             total = 0
@@ -184,12 +188,14 @@ def api_nemesis():
         if best_pokemon:
             counter_scores[best_pokemon] = counter_scores.get(best_pokemon, 0) + best_score
 
-    # Select top 6 counters (or fill with random if not enough)
+    # Select top 6 unique counters
     top_counters = sorted(counter_scores.items(), key=lambda x: x[1], reverse=True)
     nemesis_ids = [pid for pid, _ in top_counters[:6]]
-    # If fewer than 6, fill with the most common counters
-    while len(nemesis_ids) < 6:
-        nemesis_ids.append(25)  # fallback Pikachu
+
+    # Fill to 6 if needed (fallback to first available non-opponent)
+    fallback_pool = [pid for pid in all_pokemon_ids if pid not in opponent_ids and pid not in nemesis_ids]
+    while len(nemesis_ids) < 6 and fallback_pool:
+        nemesis_ids.append(fallback_pool.pop(0))
 
     cur.close()
     conn.close()
@@ -200,8 +206,10 @@ def api_nemesis():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
     if not username or not password:
         return jsonify({'error': 'Missing username or password'}), 400
 
@@ -221,10 +229,14 @@ def login():
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
     if not username or not password:
         return jsonify({'error': 'Missing username or password'}), 400
+    if len(password) < 4:
+        return jsonify({'error': 'Password must be at least 4 characters'}), 400
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -236,6 +248,9 @@ def register():
         conn.close()
         return jsonify({'success': True}), 201
     except psycopg2.IntegrityError:
+        conn.rollback()
+        cur.close()
+        conn.close()
         return jsonify({'error': 'Username already exists'}), 409
 
 @app.route('/logout', methods=['POST'])
