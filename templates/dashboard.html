@@ -363,7 +363,7 @@
 
             const results = pokemonList
                 .filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
-                .slice(0, 50);
+                .slice(0, 1000);
 
             if (results.length === 0) {
                 container.innerHTML = `<div style="padding:12px; font-size:9px; color:#888; text-align:center;">No Pokémon found for "${query}"</div>`;

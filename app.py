@@ -4,6 +4,7 @@ import requests
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from nemesis import Nemesis
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here-change-in-production'  # Change this!
@@ -12,10 +13,12 @@ app.secret_key = 'your-secret-key-here-change-in-production'  # Change this!
 DB_CONFIG = {
     'dbname': 'PokemonDatabase',
     'user': 'postgres',
-    'password': '######',
+    'password': 'abcd1234',
     'host': 'localhost',
     'port': '5432'
 }
+
+nemesis_engine = Nemesis(DB_CONFIG)
 
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
@@ -136,71 +139,20 @@ def api_delete_team(team_id):
 def api_nemesis():
     data = request.get_json()
     opponent_ids = data.get('team')
+
+    # Basic validation
     if not opponent_ids or len(opponent_ids) != 6:
         return jsonify({'error': 'Team must contain exactly 6 Pokémon IDs'}), 400
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        # Pass the request to your clean, separated class
+        nemesis_team = nemesis_engine.get_team(opponent_ids)
+        
+        return jsonify({'nemesis_team': nemesis_team}), 200
 
-    # Fetch types for all Pokémon (for quick lookup)
-    cur.execute("""
-        SELECT pt.pokemon_id, t.id, t.name
-        FROM pokemon_types pt
-        JOIN types t ON pt.type_id = t.id
-    """)
-    pokemon_types = {}
-    for pid, tid, tname in cur.fetchall():
-        if pid not in pokemon_types:
-            pokemon_types[pid] = []
-        pokemon_types[pid].append(tid)
-
-    # Fetch type effectiveness mapping
-    cur.execute("SELECT atk_id, def_id, multiplier FROM type_effectiveness")
-    effectiveness = {}
-    for atk, dfn, mul in cur.fetchall():
-        effectiveness[(atk, dfn)] = mul
-
-    # Fetch all available pokemon IDs once (not inside the loop!)
-    cur.execute("SELECT id FROM pokemon ORDER BY id")
-    all_pokemon_ids = [row[0] for row in cur.fetchall()]
-
-    # For each opponent, find the best counter based on type effectiveness
-    counter_scores = {}
-    for opp_id in opponent_ids:
-        opp_types = pokemon_types.get(opp_id, [])
-        best_score = -1
-        best_pokemon = None
-        for pid in all_pokemon_ids:
-            if pid in opponent_ids:
-                continue
-            attacker_types = pokemon_types.get(pid, [])
-            if not attacker_types or not opp_types:
-                continue
-            total = 0
-            for atk_type in attacker_types:
-                for def_type in opp_types:
-                    mul = effectiveness.get((atk_type, def_type), 1.0)
-                    total += mul
-            avg = total / (len(attacker_types) * len(opp_types))
-            if avg > best_score:
-                best_score = avg
-                best_pokemon = pid
-        if best_pokemon:
-            counter_scores[best_pokemon] = counter_scores.get(best_pokemon, 0) + best_score
-
-    # Select top 6 unique counters
-    top_counters = sorted(counter_scores.items(), key=lambda x: x[1], reverse=True)
-    nemesis_ids = [pid for pid, _ in top_counters[:6]]
-
-    # Fill to 6 if needed (fallback to first available non-opponent)
-    fallback_pool = [pid for pid in all_pokemon_ids if pid not in opponent_ids and pid not in nemesis_ids]
-    while len(nemesis_ids) < 6 and fallback_pool:
-        nemesis_ids.append(fallback_pool.pop(0))
-
-    cur.close()
-    conn.close()
-
-    return jsonify({'nemesis_team': nemesis_ids})
+    except Exception as e:
+        # Good practice to catch unexpected errors and not crash the server
+        return jsonify({'error': str(e)}), 500
 
 # ---------- Authentication routes ----------
 @app.route('/login', methods=['POST'])
