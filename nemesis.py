@@ -52,7 +52,7 @@ class Nemesis:
     TEAM_SIZE = 6
     TOP_K = 200  # action space
 
-    def __init__(self, db_config, device="cpu", model_path="nemesis_dqn.pt"):
+    def __init__(self, db_config, device="cpu", model_path="nemesis_dqn"):
         self.db_config = db_config
         self.device = torch.device(device)
         self.model_path = model_path
@@ -85,7 +85,7 @@ class Nemesis:
             print(f"Loaded pre-trained model from {self.model_path}")
         else:
             print("No saved model found. Train with .train() before using.")
-            self.train(episodes=15000)
+            self.train(episodes=30000)
 
     # ------------------------------------------------------------------
     #  Database loading (same as before)
@@ -287,5 +287,5 @@ class Nemesis:
         torch.save(self.dqn.state_dict(), path)
 
     def load(self, path):
-        self.dqn.load_state_dict(torch.load(path, map_location=self.device))
+        self.dqn.load_state_dict(torch.load(path, map_location=self.device, weights_only=True))
         self.target_dqn.load_state_dict(self.dqn.state_dict())
