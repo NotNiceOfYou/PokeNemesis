@@ -52,7 +52,7 @@ class Nemesis:
     TEAM_SIZE = 6
     TOP_K = 200  # action space
 
-    def __init__(self, db_config, device="cpu", model_path="nemesis_dqn"):
+    def __init__(self, db_config, device="cpu", model_path="nemesis_dqn.pt"):
         self.db_config = db_config
         self.device = torch.device(device)
         self.model_path = model_path
