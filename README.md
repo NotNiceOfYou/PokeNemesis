@@ -16,28 +16,6 @@ The frontend has a pixel-art theme, user accounts, team saving, and sprite image
   - Deep Q-Network (requires training)
 - PostgreSQL database with complete Kanto Pokédex (up to generation 8, 905 Pokémon), types, moves, evolutions, and FireRed/LeafGreen move data
 
-## File Structure
-
-PokéNemesis/
-├── app.py # Flask application
-├── nemesis.py # Nemesis engine (GA or DQN)
-├── nemesisGA.py # Standalone GA version (reference)
-├── nemesis_dqn.pt # Pre-trained DQN model (optional)
-├── DataExtraction.py # Populates database from PokeAPI
-├── SpriteTesting.py # Downloads sprites to static/sprites/
-├── DB_Creation.sql # SQL schema
-├── test.py # Test script for nemesis engine
-├── requirements.txt # Dependencies
-├── static/
-│ ├── css/
-│ │ └── style.css
-│ └── sprites/ # PNG images named by Pokémon name
-└── templates/
-├── login.html
-├── register.html
-└── dashboard.html
-
-
 ## Setup
 
 ### 1. Install dependencies
